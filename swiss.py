@@ -8,6 +8,7 @@
 #
 
 import vtk
+import math
 
 #
 # Next we create an instance of vtkConeSource and set some of its
@@ -39,23 +40,7 @@ coneMapper.SetInputConnection(cone.GetOutputPort())
 coneActor = vtk.vtkActor()
 coneActor.SetMapper(coneMapper)
 
-#
-# Create the Renderer and assign actors to it. A renderer is like a
-# viewport. It is part or all of a window on the screen and it is responsible
-# for drawing the actors it has.  We also set the background color here.
-#
-ren1 = vtk.vtkRenderer()
-ren1.AddActor(coneActor)
-ren1.SetBackground(0.1, 0.2, 0.4)
 
-#
-# Finally we create the render window which will show up on the screen
-# We put our renderer into the render window using AddRenderer. We also
-# set the size to be 300 pixels by 300.
-#
-renWin = vtk.vtkRenderWindow()
-renWin.AddRenderer(ren1)
-renWin.SetSize(800, 800)
 
 f = open("altitudes.txt", "r")
 dimensions = f.readline()  # first line should be dimensions: 3001 x 3001
@@ -63,15 +48,15 @@ dimensions = f.readline()  # first line should be dimensions: 3001 x 3001
 dimlist = dimensions.split()
 
 v = 0
-
+factor = 10
 
 
 points = vtk.vtkPoints()
 
-for i in range( int(dimlist[0])):
+for i in range( math.floor(int(dimlist[0]) / 2)):
     line=f.readline().split()
-    for j in range(int(dimlist[1])):
-        points.InsertNextPoint(i,j,int(line[j])) # earth curvature ignored for now, flat earth mode
+    for j in range( math.floor(int(dimlist[1]) / 2)):
+        points.InsertNextPoint(i*factor,j*factor,int(line[j])) # earth curvature ignored for now, flat earth mode
 
 
 polydata = vtk.vtkPolyData()
@@ -82,9 +67,58 @@ glyphFilter = vtk.vtkVertexGlyphFilter()
 glyphFilter.SetInputData(polydata)
 glyphFilter.Update()
 
+# Create a mapper and actor
+pointsMapper = vtk.vtkPolyDataMapper()
+pointsMapper.SetInputConnection(glyphFilter.GetOutputPort())
+
+pointsActor = vtk.vtkActor()
+pointsActor.SetMapper(pointsMapper)
+pointsActor.GetProperty().SetPointSize(3)
+
+colors = vtk.vtkNamedColors() # why ?
+
+pointsActor.GetProperty().SetColor(colors.GetColor3d("Red"))
 
 
 
+# ------------------------------------------------
+
+
+# Triangulate the grid points
+delaunay = vtk.vtkDelaunay2D()
+delaunay.SetInputData(polydata)
+delaunay.Update()
+
+# Create a mapper and actor
+triangulatedMapper = vtk.vtkPolyDataMapper()
+triangulatedMapper.SetInputConnection(delaunay.GetOutputPort())
+
+triangulatedActor = vtk.vtkActor()
+triangulatedActor.SetMapper(triangulatedMapper)
+
+# ----------------------------------------------
+
+
+
+#
+# Create the Renderer and assign actors to it. A renderer is like a
+# viewport. It is part or all of a window on the screen and it is responsible
+# for drawing the actors it has.  We also set the background color here.
+#
+ren1 = vtk.vtkRenderer()
+# ren1.AddActor(coneActor)
+ren1.AddActor(pointsActor)
+ren1.AddActor(triangulatedActor)
+ren1.SetBackground(0.1, 0.2, 0.4)
+
+#
+# Finally we create the render window which will show up on the screen
+# We put our renderer into the render window using AddRenderer. We also
+# set the size to be 300 pixels by 300.
+#
+renWin = vtk.vtkRenderWindow()
+renWin.AddRenderer(ren1)
+renWin.SetSize(800, 800)
 
 
 #
