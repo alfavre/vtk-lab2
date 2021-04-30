@@ -47,54 +47,46 @@ dimensions = f.readline()  # first line should be dimensions: 3001 x 3001
 
 dimlist = dimensions.split()
 
-v = 0
-factor = 10
+swissFraction = 1
+
+width = math.floor(int(dimlist[0]) / swissFraction)
+height = math.floor(int(dimlist[1]) / swissFraction)
+
+factor = 50
 
 
 points = vtk.vtkPoints()
+cells = vtk.vtkCellArray()
 
-for i in range( math.floor(int(dimlist[0]) / 2)):
+points_ids = [[0 for x in range(width)] for y in range(height)]
+
+for i in range( width ):
     line=f.readline().split()
-    for j in range( math.floor(int(dimlist[1]) / 2)):
-        points.InsertNextPoint(i*factor,j*factor,int(line[j])) # earth curvature ignored for now, flat earth mode
+    for j in range( height ):
+        points_ids[i][j] = points.InsertNextPoint(i*factor,j*factor,int(line[j])) # earth curvature ignored for now, flat earth mode
+
+# we could put the double for in the double for just up from here
+for i in range(width-1):
+    for j in range(height-1):
+        cells.InsertNextCell(4,[points_ids[i][j],points_ids[i+1][j+1],points_ids[i+1][j],points_ids[i][j+1]])
+
+
 
 
 polydata = vtk.vtkPolyData()
 polydata.SetPoints(points)
-
-# i dunno why this is there, experiment and find out
-glyphFilter = vtk.vtkVertexGlyphFilter()
-glyphFilter.SetInputData(polydata)
-glyphFilter.Update()
-
-# Create a mapper and actor
-pointsMapper = vtk.vtkPolyDataMapper()
-pointsMapper.SetInputConnection(glyphFilter.GetOutputPort())
-
-pointsActor = vtk.vtkActor()
-pointsActor.SetMapper(pointsMapper)
-pointsActor.GetProperty().SetPointSize(3)
-
-colors = vtk.vtkNamedColors() # why ?
-
-pointsActor.GetProperty().SetColor(colors.GetColor3d("Red"))
-
-
+polydata.SetPolys(cells)
 
 # ------------------------------------------------
 
 
-# Triangulate the grid points
-delaunay = vtk.vtkDelaunay2D()
-delaunay.SetInputData(polydata)
-delaunay.Update()
-
 # Create a mapper and actor
-triangulatedMapper = vtk.vtkPolyDataMapper()
-triangulatedMapper.SetInputConnection(delaunay.GetOutputPort())
+polydataMapper = vtk.vtkPolyDataMapper()
+# polydataMapper.SetInput(polydata)
+polydataMapper.SetInputData(polydata)
 
-triangulatedActor = vtk.vtkActor()
-triangulatedActor.SetMapper(triangulatedMapper)
+polydataActor = vtk.vtkActor()
+polydataActor.SetMapper(polydataMapper)
 
 # ----------------------------------------------
 
@@ -107,8 +99,8 @@ triangulatedActor.SetMapper(triangulatedMapper)
 #
 ren1 = vtk.vtkRenderer()
 # ren1.AddActor(coneActor)
-ren1.AddActor(pointsActor)
-ren1.AddActor(triangulatedActor)
+# ren1.AddActor(pointsActor)
+ren1.AddActor(polydataActor)
 ren1.SetBackground(0.1, 0.2, 0.4)
 
 #
