@@ -10,41 +10,11 @@
 import vtk
 import math
 
-#
-# Next we create an instance of vtkConeSource and set some of its
-# properties. The instance of vtkConeSource "cone" is part of a visualization
-# pipeline (it is a source process object); it produces data (output type is
-# vtkPolyData) which other filters may process.
-#
-cone = vtk.vtkConeSource()
-cone.SetHeight(3.0)
-cone.SetRadius(1.0)
-cone.SetResolution(10)
-
-#
-# In this example we terminate the pipeline with a mapper process object.
-# (Intermediate filters such as vtkShrinkPolyData could be inserted in
-# between the source and the mapper.)  We create an instance of
-# vtkPolyDataMapper to map the polygonal data into graphics primitives. We
-# connect the output of the cone souece to the input of this mapper.
-#
-coneMapper = vtk.vtkPolyDataMapper()
-coneMapper.SetInputConnection(cone.GetOutputPort())
-
-#
-# Create an actor to represent the cone. The actor orchestrates rendering of
-# the mapper's graphics primitives. An actor also refers to properties via a
-# vtkProperty instance, and includes an internal transformation matrix. We
-# set this actor's mapper to be coneMapper which we created above.
-#
-coneActor = vtk.vtkActor()
-coneActor.SetMapper(coneMapper)
-
-
-
+# read file
 f = open("altitudes.txt", "r")
 dimensions = f.readline()  # first line should be dimensions: 3001 x 3001
 
+# a list that contains the  2 dimensions of file
 dimlist = dimensions.split()
 
 swissFraction = 1
@@ -53,6 +23,8 @@ width = math.floor(int(dimlist[0]) / swissFraction)
 height = math.floor(int(dimlist[1]) / swissFraction)
 
 factor = 50
+maxZ = 4783
+minZ = 134
 
 
 points = vtk.vtkPoints()
@@ -60,11 +32,33 @@ cells = vtk.vtkCellArray()
 
 points_ids = [[0 for x in range(width)] for y in range(height)]
 
+# Create the color map
+colorLookupTable = vtk.vtkLookupTable()
+colorLookupTable.SetTableRange(134, 4783)
+colorLookupTable.Build()
+
+# Generate the colors for each point based on the color map
+colors = vtk.vtkUnsignedCharArray()
+colors.SetNumberOfComponents(3)
+colors.SetName('Colors')
+
+print('get points')
 for i in range( width ):
     line=f.readline().split()
     for j in range( height ):
-        points_ids[i][j] = points.InsertNextPoint(i*factor,j*factor,int(line[j])) # earth curvature ignored for now, flat earth mode
+        currentZ = int(line[j])
+        points_ids[i][j] = points.InsertNextPoint(i*factor,j*factor,currentZ) # earth curvature ignored for now, flat earth mode
+        dcolor = 3*[0.0]
+        colorLookupTable.GetColor(currentZ, dcolor)
+        color=3*[0.0]
+        for j in range(0,3):
+          color[j] = int(255.0 * dcolor[j])
+        colors.InsertNextTypedTuple(color)
 
+
+
+
+print('get cells')
 # we could put the double for in the double for just up from here
 for i in range(width-1):
     for j in range(height-1):
@@ -75,12 +69,15 @@ for i in range(width-1):
         cells.InsertCellPoint(points_ids[i][j+1])
 
 
+print('create polydata')
 # our polydata
 polydata = vtk.vtkPolyData()
 polydata.SetPoints(points)
 polydata.SetPolys(cells)
+polydata.GetPointData().SetScalars(colors)
 
 
+print('points handling (might be deleted soon)')
 #------------------------------- points
 
 # this is just to see points if needed, will be deleted
@@ -94,8 +91,9 @@ pointsActor.SetMapper(pointsMapper)
 pointsActor.GetProperty().SetPointSize(3)
 colors = vtk.vtkNamedColors()
 pointsActor.GetProperty().SetColor(colors.GetColor3d("Red"))
-# ------------------------------------------------
+# ------------------------------------------------ mapper + actor
 
+print('create mapper and actor')
 
 # Create a mapper and actor
 polydataMapper = vtk.vtkPolyDataMapper()
@@ -104,9 +102,9 @@ polydataMapper.SetInputData(polydata)
 polydataActor = vtk.vtkActor()
 polydataActor.SetMapper(polydataMapper)
 
-# ----------------------------------------------
+# ---------------------------------------------- put things in scene
 
-
+print('start rendering')
 
 #
 # Create the Renderer and assign actors to it. A renderer is like a
@@ -116,7 +114,7 @@ polydataActor.SetMapper(polydataMapper)
 ren1 = vtk.vtkRenderer()
 # ren1.AddActor(pointsActor)
 ren1.AddActor(polydataActor)
-ren1.SetBackground(0.1, 0.2, 0.4)
+ren1.SetBackground(0.8, 0.5, 0.5)
 
 #
 # Finally we create the render window which will show up on the screen
