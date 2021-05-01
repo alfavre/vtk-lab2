@@ -68,21 +68,37 @@ for i in range( width ):
 # we could put the double for in the double for just up from here
 for i in range(width-1):
     for j in range(height-1):
-        cells.InsertNextCell(4,[points_ids[i][j],points_ids[i+1][j+1],points_ids[i+1][j],points_ids[i][j+1]])
+        cells.InsertNextCell(4)
+        cells.InsertCellPoint(points_ids[i][j])
+        cells.InsertCellPoint(points_ids[i+1][j])
+        cells.InsertCellPoint(points_ids[i+1][j+1])
+        cells.InsertCellPoint(points_ids[i][j+1])
 
 
-
-
+# our polydata
 polydata = vtk.vtkPolyData()
 polydata.SetPoints(points)
 polydata.SetPolys(cells)
 
+
+#------------------------------- points
+
+# this is just to see points if needed, will be deleted
+glyphFilter = vtk.vtkVertexGlyphFilter()
+glyphFilter.SetInputData(polydata)
+glyphFilter.Update()
+pointsMapper = vtk.vtkPolyDataMapper()
+pointsMapper.SetInputConnection(glyphFilter.GetOutputPort())
+pointsActor = vtk.vtkActor()
+pointsActor.SetMapper(pointsMapper)
+pointsActor.GetProperty().SetPointSize(3)
+colors = vtk.vtkNamedColors()
+pointsActor.GetProperty().SetColor(colors.GetColor3d("Red"))
 # ------------------------------------------------
 
 
 # Create a mapper and actor
 polydataMapper = vtk.vtkPolyDataMapper()
-# polydataMapper.SetInput(polydata)
 polydataMapper.SetInputData(polydata)
 
 polydataActor = vtk.vtkActor()
@@ -98,7 +114,6 @@ polydataActor.SetMapper(polydataMapper)
 # for drawing the actors it has.  We also set the background color here.
 #
 ren1 = vtk.vtkRenderer()
-# ren1.AddActor(coneActor)
 # ren1.AddActor(pointsActor)
 ren1.AddActor(polydataActor)
 ren1.SetBackground(0.1, 0.2, 0.4)
