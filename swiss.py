@@ -18,11 +18,15 @@ swissFraction = 1
 width = math.floor(int(dimlist[0]) / swissFraction)
 height = math.floor(int(dimlist[1]) / swissFraction)
 
-factor = 50
+factor = 0.0005
 maxZ = 4783  # hard coded, but it's the max in file
 minZ = 134  # hard coded, but it's the min in file
 genf = 370  # that is what the teacher said, genf is at 370
-climate_crisis = False
+climate_crisis = True
+
+latitude_base_angle = 48
+longitude_base_angle = 5
+earth_radius = 6371000
 
 # ------------------------look up table
 
@@ -43,15 +47,15 @@ nb_colors = color_max - color_min
 
 # our color lookuptable is a vtkDiscretizableColorTransferFunction.
 # it automatically makes the gradient between our fixed colors
-c_lut = vtk.vtkDiscretizableColorTransferFunction()
-c_lut.DiscretizeOn()
-c_lut.SetNumberOfValues(nb_colors)
-c_lut.AddRGBPoint(color_min, *colorConst['BLUE'])  # special case
-c_lut.AddRGBPoint(color_min + 1, *colorConst['GREEN'])
-c_lut.AddRGBPoint(1000, *colorConst['BEIGE'])
-c_lut.AddRGBPoint(3000, *colorConst['GRAY'])
-c_lut.AddRGBPoint(color_max, *colorConst['WHITE'])
-c_lut.Build()
+clr_lut = vtk.vtkDiscretizableColorTransferFunction()
+clr_lut.DiscretizeOn()
+clr_lut.SetNumberOfValues(nb_colors)
+clr_lut.AddRGBPoint(color_min, *colorConst['BLUE'])  # special case
+clr_lut.AddRGBPoint(color_min + 1, *colorConst['GREEN'])
+clr_lut.AddRGBPoint(1000, *colorConst['BEIGE'])
+clr_lut.AddRGBPoint(3000, *colorConst['GRAY'])
+clr_lut.AddRGBPoint(color_max, *colorConst['WHITE'])
+clr_lut.Build()
 
 # --------------------------------------------
 
@@ -76,17 +80,28 @@ print('get points and color for each int')
 for i in range(width):
     for j in range(height):
 
+        pointTransform = vtk.vtkTransform()
+        pointTransform.RotateX(longitude_base_angle + (i*factor))
+        pointTransform.RotateY(latitude_base_angle + (j*factor))
+        pointTransform.Translate(0,0,earth_radius+points_ints[i][j])
+        position = 3 * [0.0]
+        position = pointTransform.GetPosition()
+
         # do points
-        points_ids[i][j] = points.InsertNextPoint(i * factor, j * factor,
-                                                  points_ints[i][j])  # earth curvature ignored for now, flat earth mode
+        points_ids[i][j] = points.InsertNextPoint(position)  # earth curvature ignored for now, flat earth mode
+
+
+
+
 
         # do scalar color
         if (i > 0 and j > 0 and i < (width - 1) and (j < (height - 1)) and (
                 points_ints[i][j] == points_ints[i - 1][j] == points_ints[i + 1][j] == points_ints[i][j - 1] ==
-                points_ints[i][j + 1])):
+                points_ints[i][j + 1] == points_ints[i + 1][j + 1] == points_ints[i + 1][j - 1] == points_ints[i - 1][
+                    j + 1] == points_ints[i - 1][j - 1])):
             # this is a lake
             dcolor = 3 * [0.0]
-            c_lut.GetColor(color_water, dcolor)  # we use the c_lut like this
+            clr_lut.GetColor(color_water, dcolor)  # we use the clr_lut like this
             color = 3 * [0.0]
             for k in range(0, 3):
                 color[k] = int(255.0 * dcolor[k])
@@ -96,7 +111,7 @@ for i in range(width):
             if climate_crisis and points_ints[i][j] < genf:
                 # this drowned
                 dcolor = 3 * [0.0]
-                c_lut.GetColor(color_water, dcolor)  # we use the c_lut like this
+                clr_lut.GetColor(color_water, dcolor)  # we use the c_lut like this
                 color = 3 * [0.0]
                 for k in range(0, 3):
                     color[k] = int(255.0 * dcolor[k])
@@ -104,7 +119,7 @@ for i in range(width):
 
             else:
                 dcolor = 3 * [0.0]
-                c_lut.GetColor(points_ints[i][j], dcolor)
+                clr_lut.GetColor(points_ints[i][j], dcolor)
                 color = 3 * [0.0]
                 for k in range(0, 3):
                     color[k] = int(255.0 * dcolor[k])
