@@ -18,15 +18,15 @@ swissFraction = 1
 width = math.floor(int(dimlist[0]) / swissFraction)
 height = math.floor(int(dimlist[1]) / swissFraction)
 
-# x = (47.5-45)/3001
-# y = (7.5-5)/3001
+# x = (47.5-45)/3001 = 0.00083305564
+# y = (7.5-5)/3001 = 0.00083305564
 # the two factor are the same, executive decision to use the same factor for both
 factor_longitude_latitude = 0.00083305564
-factor_big_swiss = 0.01
+factor_big_swiss = 0.01  # to clearly see if curvature is the correct one
 maxZ = 4783  # hard coded, but it's the max in file
 minZ = 134  # hard coded, but it's the min in file, never used
 genf = 370  # that is what the teacher said, genf is at 370
-climate_crisis = False
+climate_crisis = False  # to get the drowned map
 
 latitude_base_angle = 45
 longitude_base_angle = 7.5
@@ -38,7 +38,7 @@ colorConst = {
     'BLUE': (0.0, 0.5, 0.75),
     'GREEN': (0.0, 0.5, 0.0),
     'BEIGE': (0.9, 0.8, 0.7),
-    'GRAY': (0.8, 0.8, 0.8),
+    'GREY': (0.8, 0.8, 0.8),
     'WHITE': (1.0, 1.0, 1.0)
 }
 
@@ -56,30 +56,31 @@ color_lookuptable.SetNumberOfValues(nb_colors)
 color_lookuptable.AddRGBPoint(color_min, *colorConst['BLUE'])  # special case
 color_lookuptable.AddRGBPoint(color_min + 1, *colorConst['GREEN'])
 color_lookuptable.AddRGBPoint(1000, *colorConst['BEIGE'])
-color_lookuptable.AddRGBPoint(3000, *colorConst['GRAY'])
+color_lookuptable.AddRGBPoint(3000, *colorConst['GREY'])
 color_lookuptable.AddRGBPoint(color_max, *colorConst['WHITE'])
 color_lookuptable.Build()
 
 # --------------------------------------------
-points = vtk.vtkPoints()
-cells = vtk.vtkCellArray()
+points = vtk.vtkPoints()  # will contain points
+cells = vtk.vtkCellArray()  # will contain cells
 
 points_ids = [[0 for x in range(width)] for y in range(height)]
 points_ints = [[0 for x in range(width)] for y in
-               range(height)]  # [0][0] point en haut a gauche [max][max] en bas a droite
+               range(height)]  # [0][0]: point up left, [max][max]: point down right
 
-# Generate the colors for each point based on the color map
+# will contain colors (scalars)
 colors = vtk.vtkUnsignedCharArray()
 colors.SetNumberOfComponents(3)
 colors.SetName('Colors')
 
 print('get ints from file')  # we do this here and not below, because we need to know next altitude for lake
-# as the value in the file are rotated 90 degree left, we have to rotate back, but that mirrors the x values, so we need to unmirror the x values
+# as the value in the file are rotated 90 degree left, we have to rotate back
+# but that mirrors the x values, so we need to unmirror the x values
 for i in range(height):
     line = f.readline().split()
     for j in range(width):
-        points_ints[j][i] = int(line[(
-                                                 width - 1) - j])  # rotate back with the [j][i] instead of [i][j], we also mirror the width values with (width-1)-j
+        points_ints[j][i] = int(line[(  # rotate back with the [j][i] instead of [i][j]
+                                             width - 1) - j])  # we also mirror the width values with (width-1)-j
 
 print('get points and color for each int')
 for i in range(width):
@@ -88,9 +89,9 @@ for i in range(width):
         pointTransform = vtk.vtkTransform()
         pointTransform.RotateY(
             longitude_base_angle + (
-                        i * factor_longitude_latitude))  # to get x, we rotate around Y, we start right and go left
+                    i * factor_longitude_latitude))  # to get x, we rotate around Y, we start right and go left
         pointTransform.RotateX(latitude_base_angle - (
-                    j * factor_longitude_latitude))  # to get y we rotate around X, we start up and go down
+                j * factor_longitude_latitude))  # to get y we rotate around X, we start up and go down
         pointTransform.Translate(0, 0, (earth_radius + points_ints[i][j]))
         position = 3 * [0.0]
         position = pointTransform.GetPosition()
