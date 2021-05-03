@@ -18,11 +18,11 @@ swissFraction = 1
 width = math.floor(int(dimlist[0]) / swissFraction)
 height = math.floor(int(dimlist[1]) / swissFraction)
 
-factor = 0.0005
+factor = 0.0005 # fraction of degree betrween each point in file, pifometre
 maxZ = 4783  # hard coded, but it's the max in file
 minZ = 134  # hard coded, but it's the min in file
 genf = 370  # that is what the teacher said, genf is at 370
-climate_crisis = True
+climate_crisis = False
 
 latitude_base_angle = 48
 longitude_base_angle = 5
@@ -47,15 +47,15 @@ nb_colors = color_max - color_min
 
 # our color lookuptable is a vtkDiscretizableColorTransferFunction.
 # it automatically makes the gradient between our fixed colors
-clr_lut = vtk.vtkDiscretizableColorTransferFunction()
-clr_lut.DiscretizeOn()
-clr_lut.SetNumberOfValues(nb_colors)
-clr_lut.AddRGBPoint(color_min, *colorConst['BLUE'])  # special case
-clr_lut.AddRGBPoint(color_min + 1, *colorConst['GREEN'])
-clr_lut.AddRGBPoint(1000, *colorConst['BEIGE'])
-clr_lut.AddRGBPoint(3000, *colorConst['GRAY'])
-clr_lut.AddRGBPoint(color_max, *colorConst['WHITE'])
-clr_lut.Build()
+color_lookuptable = vtk.vtkDiscretizableColorTransferFunction()
+color_lookuptable.DiscretizeOn()
+color_lookuptable.SetNumberOfValues(nb_colors)
+color_lookuptable.AddRGBPoint(color_min, *colorConst['BLUE'])  # special case
+color_lookuptable.AddRGBPoint(color_min + 1, *colorConst['GREEN'])
+color_lookuptable.AddRGBPoint(1000, *colorConst['BEIGE'])
+color_lookuptable.AddRGBPoint(3000, *colorConst['GRAY'])
+color_lookuptable.AddRGBPoint(color_max, *colorConst['WHITE'])
+color_lookuptable.Build()
 
 # --------------------------------------------
 
@@ -71,27 +71,27 @@ colors.SetNumberOfComponents(3)
 colors.SetName('Colors')
 
 print('get ints from file')  # we do this here and not below, because we need to know next altitude for lake
-for i in range(width):
+# as the value in the file are rotated 90 degree left, we have to rotate back, but that mirrors the x values, so we need to unmirror the x values
+for i in range(height):
     line = f.readline().split()
-    for j in range(height):
-        points_ints[i][j] = int(line[j])
+    for j in range(width):
+        points_ints[j][i] = int(line[(width-1)-j]) # rotate back with the [j][i] instead of [i][j], we also mirror the width values with (width-1)-j
 
 print('get points and color for each int')
 for i in range(width):
     for j in range(height):
 
         pointTransform = vtk.vtkTransform()
-        pointTransform.RotateX(longitude_base_angle + (i*factor))
-        pointTransform.RotateY(latitude_base_angle + (j*factor))
-        pointTransform.Translate(0,0,earth_radius+points_ints[i][j])
+        pointTransform.RotateY(
+            longitude_base_angle + (i * factor))  # confusing but that is a rotation x based on snowman
+        pointTransform.RotateX(latitude_base_angle - (j * factor))  # confusing but that is latitute
+        pointTransform.Translate(0, 0, (earth_radius + points_ints[i][j]))
         position = 3 * [0.0]
         position = pointTransform.GetPosition()
 
         # do points
-        points_ids[i][j] = points.InsertNextPoint(position)  # earth curvature ignored for now, flat earth mode
-
-
-
+        points_ids[i][j] = points.InsertNextPoint(position)  # round earth
+        #points_ids[i][j] = points.InsertNextPoint(i,j,points_ints[i][j])  # flat earth
 
 
         # do scalar color
@@ -101,7 +101,7 @@ for i in range(width):
                     j + 1] == points_ints[i - 1][j - 1])):
             # this is a lake
             dcolor = 3 * [0.0]
-            clr_lut.GetColor(color_water, dcolor)  # we use the clr_lut like this
+            color_lookuptable.GetColor(color_water, dcolor)  # we use the color_lookuptable like this
             color = 3 * [0.0]
             for k in range(0, 3):
                 color[k] = int(255.0 * dcolor[k])
@@ -111,7 +111,7 @@ for i in range(width):
             if climate_crisis and points_ints[i][j] < genf:
                 # this drowned
                 dcolor = 3 * [0.0]
-                clr_lut.GetColor(color_water, dcolor)  # we use the c_lut like this
+                color_lookuptable.GetColor(color_water, dcolor)  # we use the color_lookuptable like this
                 color = 3 * [0.0]
                 for k in range(0, 3):
                     color[k] = int(255.0 * dcolor[k])
@@ -119,14 +119,14 @@ for i in range(width):
 
             else:
                 dcolor = 3 * [0.0]
-                clr_lut.GetColor(points_ints[i][j], dcolor)
+                color_lookuptable.GetColor(points_ints[i][j], dcolor)
                 color = 3 * [0.0]
                 for k in range(0, 3):
                     color[k] = int(255.0 * dcolor[k])
                 colors.InsertNextTypedTuple(color)
 
 print('get cells')
-# we could put the double for in the double for just up from here
+# we could put the double for in the double for just up from here to save computation time, but that would be complicated
 for i in range(width - 1):
     for j in range(height - 1):
         cells.InsertNextCell(4)
